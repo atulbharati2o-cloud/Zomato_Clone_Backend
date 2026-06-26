@@ -1,0 +1,46 @@
+@baseurl = http://localhost:3000/api/v1/users
+
+### Register User
+POST {{baseurl}}/register
+Content-Type: application/json
+
+{
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "contactNumber": "1234567890",
+    "password": "fdhjAH@343d",
+    "dob": "1990-01-01"
+}
+
+### Login User
+# @name loginRequest
+POST {{baseurl}}/login
+Content-Type: application/json
+
+{
+    "identifier": "john.doe@example.com",
+    "password": "fdhjAH@343d"
+}
+
+
+### Logout User
+POST {{baseurl}}/logout
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+### Get User Profile
+GET {{baseurl}}/profile
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+### Delete User Account
+DELETE {{baseurl}}/delete
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+### Get Avatar
+GET {{baseurl}}/avatar
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+### Remove Avatar
+DELETE {{baseurl}}/avatar
+Authorization: Bearer {{loginRequest.response.body.data.token}}

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const userSchema = new mongoose.Schema({
     firstName: {
@@ -13,6 +14,11 @@ const userSchema = new mongoose.Schema({
         required: true,
         trim: true,
         maxlength: 50
+    },
+    avatar: {
+        type: String,
+        trim: true,
+        default: "images/uploads/default-avatar.avif" // Default avatar path
     },
     email: {
         type: String,
