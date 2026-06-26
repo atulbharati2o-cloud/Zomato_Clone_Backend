@@ -186,3 +186,219 @@ const toggleRestaurantStatus = async (req, res) => {
     }
 };
 
+
+const addMenuItem = async (req, res) => {
+    try{
+        const { restaurantId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
+            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId);
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant not found", "Not Found");
+        }
+
+        let savedImagePaths = [];
+
+        if(req.files && req.files.length > 0){
+            for(const file of req.files){
+                const imagePath = `images/uploads/${file.filename}`;
+                savedImagePaths.push(imagePath);
+            }
+        }
+
+        const { name, description, price, isVeg, category } = req.body;
+
+        const newMenuItem = {
+            name,
+            description,
+            price,
+            images: savedImagePaths,
+            isVeg: isVeg === 'true',
+            category
+        };
+
+        restaurant.menu.push(newMenuItem);
+        await restaurant.save();
+
+        return apiResponse(res, 201, "Item added to menu successfully", { menuItem: newMenuItem });
+    } catch(error){
+        console.error("Error adding menu item:", error);
+        return apiError(res, 500, "Error adding menu item", error.message);
+    }
+};
+
+const updateMenuItem = async (req, res) => {
+    try{
+        if(req.user.role !== 'owner'){
+            return apiError(res, 403, "Access denied. Only owners can update menu items", "Forbidden");
+        }
+
+        const { restaurantId, menuItemId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
+        if(!restaurant){
+            if(req.files){
+                for(const file of req.files){
+                    await fs.unlink(file.path).catch(() => {});
+                }
+            }
+            return apiError(res, 404, "Restaurant profile not found or you are not the owner", "Not Found");
+        }
+
+        const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
+        if(menuItemIndex === -1){
+            return apiError(res, 404, "Menu item not found", "Not Found");
+        }
+
+        const allowedFields = [ "name", "description", "price", "isVeg", "category" ];
+        for(const field of allowedFields){
+            if(req.body[field] !== undefined){
+                restaurant.menu[menuItemIndex][field] = req.body[field];
+            }
+        }
+
+        if(req.files && req.files.length > 0){
+            const maxImages = 5;
+            if(restaurant.menu[menuItemIndex].images.length + req.files.length > maxImages){
+                for(const file of req.files){
+                    await fs.unlink(file.path).catch(() => {});
+                }
+                return apiError(res, 400, `You can upload a maximum of ${maxImages} images`, "Bad Request");
+            }
+
+            for(const file of req.files){
+                const imagePath = `images/uploads/${file.filename}`;
+                restaurant.menu[menuItemIndex].images.push(imagePath);
+            }
+        }
+
+        try{
+            await restaurant.save();
+        } catch(saveError){
+            if(req.files){
+                for(const file of req.files){
+                    await fs.unlink(file.path).catch(() => {});
+                }
+            }
+            throw saveError;
+        }
+
+        return apiResponse(res, 200, "Menu item updated successfully", { menuItem: restaurant.menu[menuItemIndex] });
+
+    } catch(error){
+        console.error("Error updating menu item:", error);
+        return apiError(res, 500, "Error updating menu item", error.message);
+    }
+}
+
+const deleteMenuItem = async (req, res) => {
+    try{
+        const { restaurantId, menuItemId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId);
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant not found", "Not Found");
+        }
+
+        const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
+        if(menuItemIndex === -1){
+            return apiError(res, 404, "Menu item not found", "Not Found");
+        }
+
+        if(restaurant.menu[menuItemIndex].images && restaurant.menu[menuItemIndex].images.length > 0){
+            for(const image of restaurant.menu[menuItemIndex].images){
+                const imagePath = path.join(process.cwd(), 'src', 'public', image);
+                try{
+                    await fs.access(imagePath);
+                    await fs.unlink(imagePath);
+                } catch(unlinkError){
+                    console.error("Error deleting menu item image:", unlinkError.message);
+                }
+            }
+        }
+
+        restaurant.menu.splice(menuItemIndex, 1);
+        await restaurant.save();
+
+        return apiResponse(res, 200, "Menu item deleted successfully");
+    } catch(error){
+        console.error("Error deleting menu item:", error);
+        return apiError(res, 500, "Error deleting menu item", error.message);
+    }
+};
+
+const toggleItemAvailability = async (req, res) => {
+    try{
+        const { restaurantId, menuItemId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId);
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant not found", "Not Found");
+        }
+
+        const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
+        if(menuItemIndex === -1){
+            return apiError(res, 404, "Menu item not found", "Not Found");
+        }
+
+        restaurant.menu[menuItemIndex].isAvailable = !restaurant.menu[menuItemIndex].isAvailable;
+        await restaurant.save();
+
+        return apiResponse(res, 200, `Menu item is now ${restaurant.menu[menuItemIndex].isAvailable ? 'available' : 'unavailable'}`, { isAvailable: restaurant.menu[menuItemIndex].isAvailable });
+    } catch(error){
+        console.error("Error toggling item availability:", error);
+        return apiError(res, 500, "Error toggling item availability", error.message);
+    }
+}
+
+
+
+//=================== PUBLIC CONTROLLERS ===================
+
+const getRestaurantDetails = async (req, res) => {
+    try{
+        const { restaurantId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
+            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId).select('-ratedBy');
+
+        return apiResponse(res, 200, "Restaurant details fetched successfully", { restaurant });
+
+    } catch(error){
+        console.error("Error fetching restaurant details:", error);
+        return apiError(res, 500, "Error fetching restaurant details", error.message);
+    }
+};
+
+const getMenuItems = async (req, res) => {
+    try{
+        const { restaurantId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
+            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId).select('menu');
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant not found", "Not Found");
+        }
+
+        return apiResponse(res, 200, "Menu items fetched successfully", restaurant.menu);
+    } catch(error){
+        console.error("Error fetching menu items:", error);
+        return apiError(res, 500, "Error fetching menu items", error.message);
+    }
+};
+
