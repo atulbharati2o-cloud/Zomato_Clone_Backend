@@ -112,21 +112,6 @@ const uploadBannerImage = async (req, res) => {
     }
 };
 
-const getBannerImage = async (req, res) => {
-    try{
-        const { restaurantId } = req.params;
-        const restaurant = await restaurantModel.findById(restaurantId);
-        if(!restaurant || !restaurant.bannerImage){
-            return apiError(res, 404, "Banner image not found", "Not Found");
-        }
-
-        const absoluteBannerPath = path.join(process.cwd(), 'src', 'public', restaurant.bannerImage);
-        return res.sendFile(absoluteBannerPath);
-    } catch(error){
-        console.error("Error fetching banner image:", error);
-        return apiError(res, 500, "Error fetching banner image", error.message);
-    }
-};
 
 const deleteBannerImage = async (req, res) => {
     try{
@@ -189,14 +174,23 @@ const toggleRestaurantStatus = async (req, res) => {
 
 const addMenuItem = async (req, res) => {
     try{
+        if(req.user.role !== 'owner'){
+            if(req.files){
+                for(const file of req.files){
+                    await fs.unlink(file.path).catch(() => {});
+                }
+            }
+            return apiError(res, 403, "Access denied. Only owners can add menu items", "Forbidden");
+        }
+
         const { restaurantId } = req.params;
         if(!mongoose.Types.ObjectId.isValid(restaurantId)){
             return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
         }
 
-        const restaurant = await restaurantModel.findById(restaurantId);
+        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
         if(!restaurant){
-            return apiError(res, 404, "Restaurant not found", "Not Found");
+            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
         }
 
         let savedImagePaths = [];
@@ -232,6 +226,11 @@ const addMenuItem = async (req, res) => {
 const updateMenuItem = async (req, res) => {
     try{
         if(req.user.role !== 'owner'){
+            if(req.files){
+                for(const file of req.files){
+                    await fs.unlink(file.path).catch(() => {});
+                }
+            }
             return apiError(res, 403, "Access denied. Only owners can update menu items", "Forbidden");
         }
 
@@ -298,14 +297,18 @@ const updateMenuItem = async (req, res) => {
 
 const deleteMenuItem = async (req, res) => {
     try{
+        if(req.user.role !== 'owner'){
+            return apiError(res, 403, "Access denied. Only owners can delete menu items", "Forbidden");
+        }
+
         const { restaurantId, menuItemId } = req.params;
         if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
             return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
         }
 
-        const restaurant = await restaurantModel.findById(restaurantId);
+        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
         if(!restaurant){
-            return apiError(res, 404, "Restaurant not found", "Not Found");
+            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
         }
 
         const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
@@ -337,14 +340,18 @@ const deleteMenuItem = async (req, res) => {
 
 const toggleItemAvailability = async (req, res) => {
     try{
+        if(req.user.role !== 'owner'){
+            return apiError(res, 403, "Access denied. Only owners can toggle item availability", "Forbidden");
+        }
+
         const { restaurantId, menuItemId } = req.params;
         if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
             return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
         }
 
-        const restaurant = await restaurantModel.findById(restaurantId);
+        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
         if(!restaurant){
-            return apiError(res, 404, "Restaurant not found", "Not Found");
+            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
         }
 
         const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
@@ -390,15 +397,57 @@ const getMenuItems = async (req, res) => {
             return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
         }
 
-        const restaurant = await restaurantModel.findById(restaurantId).select('menu');
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant not found", "Not Found");
+        const { page = 1, limit = 10 } = req.query;
+        const pageNumber = Math.max(1, parseInt(page));
+        const limitNumber = Math.max(1, parseInt(limit));
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const result = await restaurantModel.aggregate([
+            { $match: { _id: new mongoose.Types.ObjectId(restaurantId) } },
+            {
+                $project: {
+                    totalItems: { $size: "$menu" },
+                    menuPage: { $slice: ["$menu", skip, limitNumber] }
+                }
+            }
+        ]);
+
+        if(!result || result.length === 0){
+            return apiError(res, 404, "Restaurant profile not found", "Not Found");
         }
 
-        return apiResponse(res, 200, "Menu items fetched successfully", restaurant.menu);
+        const { totalItems, menuPage } = result[0];
+        const totalPages = Math.ceil(totalItems / limitNumber);
+
+        return apiResponse(res, 200, "Menu items fetched successfully", {
+            menu: menuPage,
+            pagination: {
+                totalItems,
+                totalPages,
+                currentPage: pageNumber,
+                itemsPerPage: limitNumber
+            }
+        });
     } catch(error){
         console.error("Error fetching menu items:", error);
         return apiError(res, 500, "Error fetching menu items", error.message);
     }
 };
 
+
+
+const getBannerImage = async (req, res) => {
+    try{
+        const { restaurantId } = req.params;
+        const restaurant = await restaurantModel.findById(restaurantId);
+        if(!restaurant || !restaurant.bannerImage){
+            return apiError(res, 404, "Banner image not found", "Not Found");
+        }
+
+        const absoluteBannerPath = path.join(process.cwd(), 'src', 'public', restaurant.bannerImage);
+        return res.sendFile(absoluteBannerPath);
+    } catch(error){
+        console.error("Error fetching banner image:", error);
+        return apiError(res, 500, "Error fetching banner image", error.message);
+    }
+};
