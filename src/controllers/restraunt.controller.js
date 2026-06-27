@@ -43,6 +43,7 @@ const createRestaurant = async (req, res) => {
     }
 };
 
+
 const getOwnerRestaurants = async (req, res) => {
     try{
         if(req.user.role !== 'owner'){
@@ -59,6 +60,7 @@ const getOwnerRestaurants = async (req, res) => {
         return apiError(res, 500, "Error fetching owner's restaurants", error.message);
     }
 };
+
 
 const uploadBannerImage = async (req, res) => {
     try{
@@ -146,6 +148,7 @@ const deleteBannerImage = async (req, res) => {
     }
 };
 
+
 const toggleRestaurantStatus = async (req, res) => {
     try{
         if(req.user.role !== 'owner'){
@@ -223,6 +226,7 @@ const addMenuItem = async (req, res) => {
     }
 };
 
+
 const updateMenuItem = async (req, res) => {
     try{
         if(req.user.role !== 'owner'){
@@ -295,6 +299,7 @@ const updateMenuItem = async (req, res) => {
     }
 }
 
+
 const deleteMenuItem = async (req, res) => {
     try{
         if(req.user.role !== 'owner'){
@@ -337,6 +342,7 @@ const deleteMenuItem = async (req, res) => {
         return apiError(res, 500, "Error deleting menu item", error.message);
     }
 };
+
 
 const toggleItemAvailability = async (req, res) => {
     try{
@@ -390,6 +396,7 @@ const getRestaurantDetails = async (req, res) => {
     }
 };
 
+
 const getMenuItems = async (req, res) => {
     try{
         const { restaurantId } = req.params;
@@ -435,7 +442,6 @@ const getMenuItems = async (req, res) => {
 };
 
 
-
 const getBannerImage = async (req, res) => {
     try{
         const { restaurantId } = req.params;
@@ -451,3 +457,111 @@ const getBannerImage = async (req, res) => {
         return apiError(res, 500, "Error fetching banner image", error.message);
     }
 };
+
+
+
+
+// ============== Rating And Review Controllers ==============
+
+const rateRestaurant = async (req, res) => {
+    try{
+        const { restaurantId } = req.params;
+        const { rating } = req.body;
+        const userId = req.user._id;
+
+        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
+            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
+        }
+
+        const numericRating = parseInt(rating);
+        if(isNaN(numericRating) || numericRating < 1 || numericRating > 5){
+            return apiError(res, 400, "Rating must be an integer between 1 and 5", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId);
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant profile not found", "Not Found");
+        }
+
+        if(!restaurant.ratedBy){
+            restaurant.ratedBy = [];
+        }
+
+        const existingRatingIndex = restaurant.ratedBy.findIndex(entry => entry.userId.toString() === userId.toString());
+        if(existingRatingIndex !== -1){
+            restaurant.ratedBy[existingRatingIndex].rating = numericRating;
+        } else {
+            restaurant.ratedBy.push({ userId, rating: numericRating });
+        }
+
+        const totalRatings = restaurant.ratedBy.length;
+        
+        const sumRatings = restaurant.ratedBy.reduce( (sum, entry) => sum + entry.rating, 0);
+        const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+        restaurant.avgRating = avgRating;
+        restaurant.totalRatings = totalRatings;
+
+        await restaurant.save();
+
+        return apiResponse(res, 200, "Restaurant rated successfully", { yourRating: numericRating, avgRating: restaurant.avgRating, totalRatings: restaurant.totalRatings });
+    } catch(error){
+        console.error("Error rating restaurant:", error);
+        return apiError(res, 500, "Error rating restaurant", error.message);
+    }
+};
+
+
+const rateMenuItem = async (req, res) => {
+    try{
+        const { restaurantId, menuItemId } = req.params;
+        const { rating } = req.body;
+        const userId = req.user._id;
+
+        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
+        }
+
+        const numericRating = parseInt(rating);
+        if(isNaN(numericRating) || numericRating < 1 || numericRating > 5){
+            return apiError(res, 400, "Rating must be an integer between 1 and 5", "Bad Request");
+        }
+
+        const restaurant = await restaurantModel.findById(restaurantId);
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant profile not found", "Not Found");
+        }
+
+        const itemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
+        if(itemIndex === -1){
+            return apiError(res, 404, "Menu item not found", "Not Found");
+        }
+
+        const menuItem = restaurant.menu[itemIndex];
+
+        if(!menuItem.ratedBy){
+            menuItem.ratedBy = [];
+        }
+
+        const existingRatingIndex = menuItem.ratedBy.findIndex(entry => entry.userId.toString() === userId.toString());
+        if(existingRatingIndex !== -1){
+            menuItem.ratedBy[existingRatingIndex].rating = numericRating;
+        } else {
+            menuItem.ratedBy.push({ userId, rating: numericRating });
+        }
+
+        const totalRatings = menuItem.ratedBy.length;
+        const sumRatings = menuItem.ratedBy.reduce((sum, entry) => sum + entry.rating, 0);
+        const avgRating = totalRatings > 0 ? sumRatings / totalRatings : 0;
+
+        menuItem.avgRating = avgRating;
+        menuItem.totalRatings = totalRatings;
+
+        await restaurant.save();
+
+        return apiResponse(res, 200, "Menu item rated successfully", { dishName: menuItem.name, yourRating: numericRating, avgRating: menuItem.avgRating, totalRatings: menuItem.totalRatings });
+    } catch(error){
+        console.error("Error rating menu item:", error);
+        return apiError(res, 500, "Error rating menu item", error.message);
+    }
+}
