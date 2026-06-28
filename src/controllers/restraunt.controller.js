@@ -10,10 +10,6 @@ const mongoose = require('mongoose');
 // =================== OWNER SPECIFIC CONTROLLERS ===================
 const createRestaurant = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can create restaurants", "Forbidden");
-        }
-
         const ownerId = req.user._id;
         const { name, description, addressLine, coordinates } = req.body;
 
@@ -46,10 +42,6 @@ const createRestaurant = async (req, res) => {
 
 const getOwnerRestaurants = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can view their restaurants", "Forbidden");
-        }
-
         const ownerId = req.user._id;
         const restaurants = await restaurantModel.find({ owner: ownerId }).select('-menu -ratedBy');
 
@@ -62,21 +54,34 @@ const getOwnerRestaurants = async (req, res) => {
 };
 
 
+const updateRestaurantDetails = async (req, res) => {
+    try{
+        const ownerId = req.user._id;
+        const restaurant = req.restaurant;
+
+        const allowedFields = [ "name", "description", "addressLine", "coordinates" ];
+        for(const field of allowedFields){
+            if(req.body[field] !== undefined){
+                if(field === "coordinates"){
+                    restaurant.location.coordinates = req.body.coordinates;
+                } else {
+                    restaurant[field] = req.body[field];
+                }
+            }
+        }
+
+        await restaurant.save();
+        return apiResponse(res, 200, "Restaurant details updated successfully", { restaurant });
+    } catch(error){
+        console.error("Error updating restaurant details:", error);
+        return apiError(res, 500, "Error updating restaurant details", error.message);
+    }
+}
+
+
 const uploadBannerImage = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can upload banner images", "Forbidden");
-        }
-
-        const { restaurantId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
-            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
-        }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
-        }
+        const restaurant = req.restaurant;
 
         if(!req.file){
             return apiError(res, 400, "No banner image file uploaded", "Bad Request");
@@ -117,18 +122,10 @@ const uploadBannerImage = async (req, res) => {
 
 const deleteBannerImage = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can delete banner images", "Forbidden");
-        }
+        const restaurant = req.restaurant;
 
-        const { restaurantId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
-            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
-        }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant || !restaurant.bannerImage){
-            return apiError(res, 404, "Banner image not found or you are not the owner", "Not Found");
+        if(!restaurant.bannerImage || restaurant.bannerImage === ""){
+            return apiError(res, 404, "No banner image.", "Not Found");
         }
 
         const bannerImagePath = path.join(process.cwd(), 'src', 'public', restaurant.bannerImage);
@@ -151,19 +148,7 @@ const deleteBannerImage = async (req, res) => {
 
 const toggleRestaurantStatus = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can toggle restaurant status", "Forbidden");
-        }
-
-        const { restaurantId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
-            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
-        }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
-        }
+        const restaurant = req.restaurant;
 
         restaurant.isOpen = !restaurant.isOpen;
         await restaurant.save();
@@ -177,24 +162,7 @@ const toggleRestaurantStatus = async (req, res) => {
 
 const addMenuItem = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            if(req.files){
-                for(const file of req.files){
-                    await fs.unlink(file.path).catch(() => {});
-                }
-            }
-            return apiError(res, 403, "Access denied. Only owners can add menu items", "Forbidden");
-        }
-
-        const { restaurantId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId)){
-            return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
-        }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
-        }
+        const restaurant = req.restaurant;
 
         let savedImagePaths = [];
 
@@ -229,28 +197,11 @@ const addMenuItem = async (req, res) => {
 
 const updateMenuItem = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            if(req.files){
-                for(const file of req.files){
-                    await fs.unlink(file.path).catch(() => {});
-                }
-            }
-            return apiError(res, 403, "Access denied. Only owners can update menu items", "Forbidden");
-        }
+        const restaurant = req.restaurant;
 
-        const { restaurantId, menuItemId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
-            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
-        }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant){
-            if(req.files){
-                for(const file of req.files){
-                    await fs.unlink(file.path).catch(() => {});
-                }
-            }
-            return apiError(res, 404, "Restaurant profile not found or you are not the owner", "Not Found");
+        const { menuItemId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid menu item ID", "Bad Request");
         }
 
         const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
@@ -302,18 +253,11 @@ const updateMenuItem = async (req, res) => {
 
 const deleteMenuItem = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can delete menu items", "Forbidden");
-        }
+        const restaurant = req.restaurant;
 
-        const { restaurantId, menuItemId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
-            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
-        }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
+        const { menuItemId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid menu item ID", "Bad Request");
         }
 
         const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
@@ -346,20 +290,13 @@ const deleteMenuItem = async (req, res) => {
 
 const toggleItemAvailability = async (req, res) => {
     try{
-        if(req.user.role !== 'owner'){
-            return apiError(res, 403, "Access denied. Only owners can toggle item availability", "Forbidden");
-        }
+        const restaurant = req.restaurant;
 
-        const { restaurantId, menuItemId } = req.params;
-        if(!mongoose.Types.ObjectId.isValid(restaurantId) || !mongoose.Types.ObjectId.isValid(menuItemId)){
-            return apiError(res, 400, "Invalid restaurant ID or menu item ID", "Bad Request");
+        const { menuItemId } = req.params;
+        if(!mongoose.Types.ObjectId.isValid(menuItemId)){
+            return apiError(res, 400, "Invalid menu item ID", "Bad Request");
         }
-
-        const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant not found or you are not the owner", "Not Found");
-        }
-
+        
         const menuItemIndex = restaurant.menu.findIndex(item => item._id.toString() === menuItemId);
         if(menuItemIndex === -1){
             return apiError(res, 404, "Menu item not found", "Not Found");
@@ -473,25 +410,16 @@ const rateRestaurant = async (req, res) => {
             return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
         }
 
-        const numericRating = parseInt(rating);
-        if(isNaN(numericRating) || numericRating < 1 || numericRating > 5){
-            return apiError(res, 400, "Rating must be an integer between 1 and 5", "Bad Request");
-        }
-
         const restaurant = await restaurantModel.findById(restaurantId);
         if(!restaurant){
             return apiError(res, 404, "Restaurant profile not found", "Not Found");
         }
 
-        if(!restaurant.ratedBy){
-            restaurant.ratedBy = [];
-        }
-
         const existingRatingIndex = restaurant.ratedBy.findIndex(entry => entry.userId.toString() === userId.toString());
         if(existingRatingIndex !== -1){
-            restaurant.ratedBy[existingRatingIndex].rating = numericRating;
+            restaurant.ratedBy[existingRatingIndex].rating = rating;
         } else {
-            restaurant.ratedBy.push({ userId, rating: numericRating });
+            restaurant.ratedBy.push({ userId, rating });
         }
 
         const totalRatings = restaurant.ratedBy.length;
@@ -504,7 +432,7 @@ const rateRestaurant = async (req, res) => {
 
         await restaurant.save();
 
-        return apiResponse(res, 200, "Restaurant rated successfully", { yourRating: numericRating, avgRating: restaurant.avgRating, totalRatings: restaurant.totalRatings });
+        return apiResponse(res, 200, "Restaurant rated successfully", { yourRating: rating  , avgRating: restaurant.avgRating, totalRatings: restaurant.totalRatings });
     } catch(error){
         console.error("Error rating restaurant:", error);
         return apiError(res, 500, "Error rating restaurant", error.message);
@@ -565,3 +493,26 @@ const rateMenuItem = async (req, res) => {
         return apiError(res, 500, "Error rating menu item", error.message);
     }
 }
+
+
+
+
+
+
+module.exports = {
+    createRestaurant,
+    getOwnerRestaurants,
+    updateRestaurantDetails,
+    uploadBannerImage,
+    deleteBannerImage,
+    toggleRestaurantStatus,
+    addMenuItem,
+    updateMenuItem,
+    deleteMenuItem,
+    toggleItemAvailability,
+    getRestaurantDetails,
+    getMenuItems,
+    getBannerImage,
+    rateRestaurant,
+    rateMenuItem
+};
