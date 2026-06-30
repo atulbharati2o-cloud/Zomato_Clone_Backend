@@ -180,7 +180,7 @@ const addMenuItem = async (req, res) => {
             description,
             price,
             images: savedImagePaths,
-            isVeg: isVeg === 'true',
+            isVeg: isVeg === 'true' || isVeg === true,
             category
         };
 

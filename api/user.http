@@ -5,12 +5,13 @@ POST {{baseurl}}/register
 Content-Type: application/json
 
 {
-    "firstName": "John",
-    "lastName": "Doe",
-    "email": "john.doe@example.com",
-    "contactNumber": "1234567890",
+    "firstName": "Atul",
+    "lastName": "Bharati",
+    "email": "atul.bharati@example.com",
+    "contactNumber": "+91-9876543210",
     "password": "fdhjAH@343d",
-    "dob": "1990-01-01"
+    "dob": "1990-01-01",
+    "role": "owner"
 }
 
 ### Login User
@@ -19,7 +20,7 @@ POST {{baseurl}}/login
 Content-Type: application/json
 
 {
-    "identifier": "john.doe@example.com",
+    "identifier": "atul.bharati@example.com",
     "password": "fdhjAH@343d"
 }
 

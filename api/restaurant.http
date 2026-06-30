@@ -1,0 +1,118 @@
+@baseurl = http://localhost:3000/api/v1/restaurants
+
+
+### Login 
+# @name loginRequest
+POST http://localhost:3000/api/v1/users/login
+Content-Type: application/json
+
+{
+    "identifier": "john.doe@example.com",
+    "password": "fdhjAH@343d"
+}
+
+### Create a new restaurant
+POST {{baseurl}}/
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "name": "Al Fresco Dine",
+    "description": "A cozy outdoor dining experience with a variety of international cuisines.",
+    "addressLine": "456 Garden Lane, Greenfield",
+    "coordinates": [
+        -122.4194,
+        37.7749
+    ]
+}
+
+### get all restaurants owned by you
+GET {{baseurl}}/owner
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+### Update restaurant details
+@restaurantId = 6a4253263b1040166d75f1b1
+PATCH {{baseurl}}/{{restaurantId}}
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "description": "An updated description for The Gourmet Kitchen, highlighting our new seasonal menu and chef's specials."
+}
+
+
+### Get banner image of restaurant
+GET {{baseurl}}/{{restaurantId}}/banner
+
+
+### Delete banner image
+DELETE {{baseurl}}/{{restaurantId}}/banner
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+### Get restaurant details
+GET {{baseurl}}/{{restaurantId}}
+
+
+### Toggle restaurant status
+PATCH {{baseurl}}/{{restaurantId}}/status
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+### Add a new menu item
+POST {{baseurl}}/{{restaurantId}}/menu
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "name": "Spaghetti Carbonara",
+    "description": "A classic Italian pasta dish with eggs, cheese, pancetta, and black pepper.",
+    "price": 14.99,
+    "isVeg": true,
+    "category": "Main Course"
+}
+
+
+
+### Delete a menu item
+@menuItemId = 6a42bdf83b1040166d75f1b8
+DELETE {{baseurl}}/{{restaurantId}}/menu/{{menuItemId}}
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+#### Update a menu item
+PATCH {{baseurl}}/{{restaurantId}}/menu/6a435f3e52cc812eab51417e
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "isVeg": true
+}
+
+
+### Toggle menu item availability
+PATCH {{baseurl}}/{{restaurantId}}/menu/6a435f3e52cc812eab51417e/availability
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+### Get all menu items of a restaurant
+GET {{baseurl}}/{{restaurantId}}/menu
+
+
+### Rate a restaurant
+POST {{baseurl}}/{{restaurantId}}/rate
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "rating": 2
+}
+
+### Rate a menu item
+POST {{baseurl}}/{{restaurantId}}/menu/6a435f3e52cc812eab51417e/rate
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "rating": 1
+}

@@ -31,7 +31,7 @@ const isLoggedIn = async (req, res, next) => {
     }
 };
 
-const isDriver = (req, res, next) => {
+const isDriver = async (req, res, next) => {
     try{
         if(req.user?.role !== "driver"){
             return apiError(res, 403, "Forbidden: Drivers only", "Forbidden: Drivers only");
@@ -43,7 +43,7 @@ const isDriver = (req, res, next) => {
     }
 };
 
-const isOwner = (req, res, next) => {
+const isOwner = async (req, res, next) => {
     try{
 
         // role check

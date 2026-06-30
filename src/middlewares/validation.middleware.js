@@ -3,7 +3,7 @@ const apiResponse = require("../utils/apiResponse.js");
 const { ZodError } = require("zod");
 const cleanupUploadedFiles = require("../utils/cleanupUploadedFiles.js");
 
-const validate = (schema) => (req, res, next) => {
+const validate = (schema) => async (req, res, next) => {
     try{
         if(req.body.coordinates && typeof req.body.coordinates === 'string'){
             try{
