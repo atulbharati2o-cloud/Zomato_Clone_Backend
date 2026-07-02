@@ -140,5 +140,36 @@ const restaurantSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Geospatial index for proximity searches
+restaurantSchema.index({ location: '2dsphere' });
+
+// Global Text search index
+restaurantSchema.index({
+    name: 'text',
+    description: "text",
+    'menu.name': "text",
+    'menu.description': "text"
+}, {
+    name: "zomato_global_text_search_index",
+    weights: {
+        name: 10,
+        description: 5,
+        'menu.name': 3,
+        'menu.description': 2
+    }
+});
+
+// Home feed index
+restaurantSchema.index({
+    isOpen: -1,
+    totalRatings: -1,
+    avgRating: -1
+}, {
+    name: "zomato_home_feed_index"
+});
+
+//
+
+
 const Restaurant = mongoose.model('Restaurant', restaurantSchema);
 module.exports = Restaurant;

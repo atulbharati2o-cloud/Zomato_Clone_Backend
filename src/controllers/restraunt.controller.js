@@ -341,37 +341,104 @@ const getMenuItems = async (req, res) => {
             return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
         }
 
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, searchContext } = req.query;
         const pageNumber = Math.max(1, parseInt(page));
         const limitNumber = Math.max(1, parseInt(limit));
         const skip = (pageNumber - 1) * limitNumber;
 
-        const result = await restaurantModel.aggregate([
-            { $match: { _id: new mongoose.Types.ObjectId(restaurantId) } },
-            {
-                $project: {
-                    totalItems: { $size: "$menu" },
-                    menuPage: { $slice: ["$menu", skip, limitNumber] }
-                }
-            }
-        ]);
-
-        if(!result || result.length === 0){
+        const restaurant = await restaurantModel.findById(restaurantId).select('menu');
+        if(!restaurant){
             return apiError(res, 404, "Restaurant profile not found", "Not Found");
         }
 
-        const { totalItems, menuPage } = result[0];
+        let fullMenu = restaurant.menu || [];
+        let organizedMenu = [];
+        let pinnedCount = 0;
+
+        if(searchContext && searchContext.trim() !== ""){
+            const query = searchContext.trim().toLowerCase();
+
+            // Split into tokens, remove common stopwords/noise words
+            const stopWords = new Set(["the", "and", "or", "of", "in", "on", "at", "to", "for", "with", "a", "an"]);
+
+            // suppose search query is "Spicy Chicken Wings", then tokens will be ["spicy", "chicken", "wings"]
+            const tokens = query
+                .split(/\s+/)
+                .filter(Boolean)
+                .filter(token => !stopWords.has(token));
+
+            
+            const scoreItem = (item) => {
+                const name = item.name.trim().toLowerCase();
+                const description = (item.description || "").trim().toLowerCase();
+                const category = item.category.trim().toLowerCase();
+
+                let score = 0;
+
+                // Full query match
+                if(name.includes(query)) score += 100;
+                else if(description.includes(query)) score += 40;
+                else if(category.includes(query)) score += 30;
+
+                let nameTokenHits = 0;
+                // more tokens match --> more score. Name matches are more valuable than description or category matches.
+                for(const token of tokens){
+                    if(name.includes(token)){
+                        score += 20;
+                        nameTokenHits++; 
+                    } else if(description.includes(token)){
+                        score += 10;
+                    } else if(category.includes(token)){
+                        score += 5;
+                    }
+                }
+
+                if(tokens.length > 0 && nameTokenHits === tokens.length){
+                    score += 30; // Bonus for all tokens in name
+                }
+
+                return score;
+            }
+
+
+            const scoredMenu = fullMenu.map(item => ({
+                item,
+                score: scoreItem(item)
+            }));
+
+            const matchedItems = scoredMenu.filter(entry => entry.score > 0);
+            const unmatchedItems = scoredMenu.filter(entry => entry.score === 0);
+
+            matchedItems.sort( (a, b) => {
+                if(b.score !== a.score) return b.score - a.score; // Higher score first
+                return a.item.name.localeCompare(b.item.name); // Alphabetical order if scores are equal
+            });
+
+
+            pinnedCount = matchedItems.length;
+            organizedMenu = [ ...matchedItems.map(entry => entry.item), ...unmatchedItems.map(entry => entry.item) ];
+
+        } else{
+            organizedMenu = fullMenu;
+        }
+
+
+        const totalItems = organizedMenu.length;
+        const paginatedMenu = organizedMenu.slice(skip, skip + limitNumber);
         const totalPages = Math.ceil(totalItems / limitNumber);
 
         return apiResponse(res, 200, "Menu items fetched successfully", {
-            menu: menuPage,
+            hasPinnedItems: pinnedCount > 0,
+            pinnedCount,
+            menu: paginatedMenu,
             pagination: {
                 totalItems,
-                totalPages,
                 currentPage: pageNumber,
+                totalPages,
                 itemsPerPage: limitNumber
             }
         });
+
     } catch(error){
         console.error("Error fetching menu items:", error);
         return apiError(res, 500, "Error fetching menu items", error.message);
@@ -497,6 +564,54 @@ const rateMenuItem = async (req, res) => {
 
 
 
+// =================== Zomato Home Feed Controller ===================
+const getNearbyRestaurantsFeed = async (req, res) => {
+    try{
+        const { lng, lat, radius = 5000, page = 1, limit = 10 } = req.query;
+
+        if(!lng || !lat){
+            return apiError(res, 400, "Longitude and latitude are required for home feed", "Bad Request");
+        }
+
+        const pageNumber = Math.max(1, parseInt(page));
+        const limitNumber = Math.max(1, parseInt(limit));
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const queryCondition = {
+            isOpen: true,
+            location: {
+                $nearSphere: {
+                    $geometry: { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] },
+                    $maxDistance: parseInt(radius)
+                }
+            }
+        }
+
+        const totalRestaurants = await restaurantModel.countDocuments(queryCondition);
+
+        const restaurants = await restaurantModel.find(queryCondition)
+            .select('name description bannerImage avgRating totalRatings location addressLine isOpen')
+            .sort({ totalRatings: -1, avgRating: -1 })
+            .skip(skip)
+            .limit(limitNumber)
+            .lean();
+
+        return apiResponse(res, 200, "Home restaurants feed fetched successfully", {
+            restaurants,
+            pagination: {
+                totalRestaurants,
+                currentPage: pageNumber,
+                totalPages: Math.ceil(totalRestaurants / limitNumber),
+                itemsPerPage: limitNumber
+            }
+        })
+    } catch(error){
+        console.error("Error fetching nearby restaurants feed:", error);
+        return apiError(res, 500, "Internal Server Error fetching nearby restaurants feed", error.message);
+    }
+}
+
+
 
 
 module.exports = {
@@ -514,5 +629,6 @@ module.exports = {
     getMenuItems,
     getBannerImage,
     rateRestaurant,
-    rateMenuItem
+    rateMenuItem,
+    getNearbyRestaurantsFeed
 };
