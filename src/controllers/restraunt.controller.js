@@ -11,7 +11,7 @@ const mongoose = require('mongoose');
 const createRestaurant = async (req, res) => {
     try{
         const ownerId = req.user._id;
-        const { name, description, addressLine, coordinates } = req.body;
+        const { name, description, pureVeg, addressLine, coordinates } = req.body;
 
         const restaurantExists = await restaurantModel.findOne({ name, owner: ownerId, addressLine });
         if(restaurantExists){
@@ -21,6 +21,7 @@ const createRestaurant = async (req, res) => {
         const newRestaurant = await restaurantModel.create({
             name,
             description,
+            pureVeg,
             addressLine,
             owner: ownerId,
             location: {
@@ -59,7 +60,7 @@ const updateRestaurantDetails = async (req, res) => {
         const ownerId = req.user._id;
         const restaurant = req.restaurant;
 
-        const allowedFields = [ "name", "description", "addressLine", "coordinates" ];
+        const allowedFields = [ "name", "description", "pureVeg", "addressLine", "coordinates" ];
         for(const field of allowedFields){
             if(req.body[field] !== undefined){
                 if(field === "coordinates"){
@@ -324,6 +325,9 @@ const getRestaurantDetails = async (req, res) => {
         }
 
         const restaurant = await restaurantModel.findById(restaurantId).select('-ratedBy');
+        if(!restaurant){
+            return apiError(res, 404, "Restaurant profile not found", "Not Found");
+        }
 
         return apiResponse(res, 200, "Restaurant details fetched successfully", { restaurant });
 
@@ -590,7 +594,7 @@ const getNearbyRestaurantsFeed = async (req, res) => {
         const totalRestaurants = await restaurantModel.countDocuments(queryCondition);
 
         const restaurants = await restaurantModel.find(queryCondition)
-            .select('name description bannerImage avgRating totalRatings location addressLine isOpen')
+            .select('name description pureVeg bannerImage avgRating totalRatings location addressLine isOpen')
             .sort({ totalRatings: -1, avgRating: -1 })
             .skip(skip)
             .limit(limitNumber)
