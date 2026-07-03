@@ -1,0 +1,51 @@
+@baseurl = http://localhost:3000/api/v1/cart
+
+
+### Login User
+# @name loginRequest
+POST http://localhost:3000/api/v1/users/login
+Content-Type: application/json
+
+{
+    "identifier": "john.doe@example.com",
+    "password": "fdhjAH@343d"
+}
+
+
+
+### Add item to cart
+POST {{baseurl}}/add
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "restaurantId": "6a4774f4243e99bd3072f1de",
+    "menuItemId": "6a4774f4243e99bd3072f1e3",
+    "quantity": 2
+}
+
+### Update item quantity in cart
+
+PATCH  {{baseurl}}/6a479e0da99e34c2d75db92b/item
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+Content-Type: application/json
+
+{
+    "menuItemId": "6a435fa99089fbeff1a6113d",
+    "quantity": 3
+}
+
+
+### Get a cart
+GET {{baseurl}}/restaurant/6a4774f4243e99bd3072f1de
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+### Get all carts for a user
+GET {{baseurl}}/all
+Authorization: Bearer {{loginRequest.response.body.data.token}}
+
+
+### Remove item from cart
+DELETE {{baseurl}}/6a479e0da99e34c2d75db92b/item/6a435fa99089fbeff1a6113d
+Authorization: Bearer {{loginRequest.response.body.data.token}}

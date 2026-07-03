@@ -116,3 +116,8 @@ Content-Type: application/json
 {
     "rating": 1
 }
+
+
+### Get nearby restaurants home feed
+GET {{baseurl}}/home?lng=77.38&lat=28.54
+Authorization: Bearer {{loginRequest.response.body.data.token}}

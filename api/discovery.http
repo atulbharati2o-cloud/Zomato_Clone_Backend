@@ -1,0 +1,16 @@
+@baseurl = http://localhost:3000/api/v1/discovery
+
+
+### Login User
+# @name loginRequest
+POST http://localhost:3000/api/v1/users/login
+Content-Type: application/json
+
+{
+    "identifier": "john.doe@example.com",
+    "password": "fdhjAH@343d"
+}
+
+### Global Text Search
+GET {{baseurl}}/search?lng=77.38&lat=28.54&keyword=lime+coffee&radius=3000000
+Authorization: Bearer {{loginRequest.response.body.data.token}}

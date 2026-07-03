@@ -9,7 +9,7 @@ const getZomatoSearchFeed = async (req, res) => {
             lng, lat,
             radius = 5000,
             keyword,
-            isVeg,
+            pureVeg,
             page = 1,
             limit = 10
         } = req.query;
@@ -30,9 +30,9 @@ const getZomatoSearchFeed = async (req, res) => {
             return apiError(res, 400, "Invalid query parameters", "Longitude, Latitude, and Radius must be valid numbers.");
         }
 
-        const vegFilterMode = isVeg === undefined 
+        const vegFilterMode = pureVeg === undefined 
             ? 'all'
-            : (isVeg === 'true' || isVeg === true)
+            : (pureVeg === 'true' || pureVeg === true)
                  ? 'veg'
                  : 'non-veg'
 

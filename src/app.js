@@ -10,9 +10,13 @@ app.use(express.static(path.join(__dirname, "public")));
 
 
 
-app.use("/api/v1/users", require("./routes/user.route.js"))
+app.use("/api/v1/users", require("./routes/user.route.js"));
 
-app.use("/api/v1/restaurants", require("./routes/restaurant.route.js"))
+app.use("/api/v1/restaurants", require("./routes/restaurant.route.js"));
+
+app.use("/api/v1/discovery", require("./routes/discovery.route.js"));
+
+app.use("/api/v1/cart", require("./routes/cart.route.js"));
 
 
 

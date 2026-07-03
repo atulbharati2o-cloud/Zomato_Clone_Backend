@@ -14,6 +14,10 @@ router.post("/", isLoggedIn, isOwner, validate(val.createRestaurantSchema), rc.c
 // get all restaurants of the owner
 router.get("/owner", isLoggedIn, isOwner, rc.getOwnerRestaurants);
 
+// get nearby restaurants home feed
+router.get("/home", isLoggedIn, rc.getNearbyRestaurantsFeed);
+
+
 // update restaurant details
 router.patch("/:restaurantId", isLoggedIn, isOwner, validate(val.updateRestaurantSchema), rc.updateRestaurantDetails);
 

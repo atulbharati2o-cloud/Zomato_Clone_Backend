@@ -113,7 +113,7 @@ const addItemToCart = async (req, res) => {
         }
 
         const enrichedCart = enrichCartWithLiveMenuData(cart, restaurant);
-        return apiResponse.success(res, 200, "Item added to cart successfully", { cart: enrichedCart });
+        return apiResponse(res, 200, "Item added to cart successfully", { cart: enrichedCart });
 
     } catch(error){
         console.error("Error in addItemToCart:", error);

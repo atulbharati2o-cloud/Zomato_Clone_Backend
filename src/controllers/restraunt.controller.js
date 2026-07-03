@@ -581,7 +581,8 @@ const getNearbyRestaurantsFeed = async (req, res) => {
         const limitNumber = Math.max(1, parseInt(limit));
         const skip = (pageNumber - 1) * limitNumber;
 
-        const queryCondition = {
+        // nearSphere query finds the nearby restaurants and sorts according to distance
+        const findQueryCondition = {
             isOpen: true,
             location: {
                 $nearSphere: {
@@ -591,11 +592,21 @@ const getNearbyRestaurantsFeed = async (req, res) => {
             }
         }
 
-        const totalRestaurants = await restaurantModel.countDocuments(queryCondition);
+        // geoWithin query finds the nearby restaurants but does not sort according to distance
+        const countQueryCondition = {
+            isOpen: true,
+            location: {
+                $geoWithin: {
+                    $centerSphere: [[parseFloat(lng), parseFloat(lat)], parseInt(radius) / 6378137]
+                }
+            }
+        }
 
-        const restaurants = await restaurantModel.find(queryCondition)
+        // we cannot use findQueryCondition as it has nearSphere that does sorting and we want to count all nearby restaurants without sorting, so we use countQueryCondition for counting
+        const totalRestaurants = await restaurantModel.countDocuments(countQueryCondition);
+
+        const restaurants = await restaurantModel.find(findQueryCondition)
             .select('name description pureVeg bannerImage avgRating totalRatings location addressLine isOpen')
-            .sort({ totalRatings: -1, avgRating: -1 })
             .skip(skip)
             .limit(limitNumber)
             .lean();
