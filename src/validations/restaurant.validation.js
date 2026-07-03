@@ -9,6 +9,8 @@ const createRestaurantSchema = z.object({
         .trim()
         .max(500, "Description cannot exceed 500 characters")
         .optional(),
+    pureVeg: z.string().or(z.boolean())
+        .transform((val) => typeof val === 'string' ? val.toLowerCase() === 'true' : val),
     addressLine: z.string()
         .trim()
         .min(5, "Address line is required"),
@@ -35,9 +37,9 @@ const addMenuItemSchema = z.object({
         .refine((val) => !isNaN(val) && val >= 0, {
             message: "Price must be a positive number"
         }),
-        isVeg: z.string().or(z.boolean())
+    isVeg: z.string().or(z.boolean())
         .transform((val) => typeof val === 'string' ? val.toLowerCase() === 'true' : val),
-        category: z.string()
+    category: z.string()
         .trim()
         .min(1, "Category is required")
         .toLowerCase()
