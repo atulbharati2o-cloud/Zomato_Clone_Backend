@@ -29,7 +29,7 @@ const placeOrderSchema = z.object({
 
 const updateOrderStatusSchema = z.object({
     status: z.enum(
-        ["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"],
+        ["confirmed", "preparing", "ready_for_pickup", "out_for_delivery", "delivered", "cancelled"],
         { errorMap: () => ({ message: "Invalid order status" }) }
     ),
     cancellationReason: z.string()

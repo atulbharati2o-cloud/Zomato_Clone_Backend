@@ -4,8 +4,7 @@ const cartModel = require("../models/cart.model.js");
 const restaurantModel = require("../models/restaurant.model.js");
 const orderModel = require("../models/order.model.js");
 const mongoose = require("mongoose");
-
-const { clearCart } = require("../controllers/cart.controller.js");
+const claimNearestAvailableDriver = require("../services/driverAssignment.service.js");
 
 const { ORDER_STATUSES } = require("../utils/constants.js");
 
@@ -13,7 +12,8 @@ const { ORDER_STATUSES } = require("../utils/constants.js");
 const ALLOWED_TRANSITIONS = {
     placed: ['confirmed', 'cancelled'],
     confirmed: ['preparing', 'cancelled'],
-    preparing: ['out_for_delivery'],
+    preparing: ['ready_for_pickup', 'cancelled'],
+    ready_for_pickup: ['out_for_delivery'],
     out_for_delivery: ['delivered'],
     delivered: [],
     cancelled: []
@@ -241,6 +241,17 @@ const updateOrderStatus = async (req, res) => {
 
         if(nextStatus === 'cancelled' && !cancellationReason){
             return apiError(res, 400, "Cancellation reason required", "Bad Request");
+        }
+
+        if(nextStatus === 'ready_for_pickup'){
+            const restaurant = req.restaurant;
+            const driver = await claimNearestAvailableDriver(restaurant.location.coordinates);
+
+            if(!driver){
+                return apiError(res, 503, "No available drivers nearby right now", "Service Unavailable");
+            }
+
+            order.deliveryPartner = driver._id;
         }
 
         order.status = nextStatus;

@@ -93,8 +93,23 @@ const userSchema = new mongoose.Schema({
     isAvailable: {
         type: Boolean,
         default: false
+    },
+    // Driver's live location
+    currentLocation: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            default: undefined
+        }
     }
 }, { timestamps: true });
+
+
+userSchema.index({ currentLocation: '2dsphere' });
 
 userSchema.pre('save', async function(next) {
     if(this.isModified('password')){
