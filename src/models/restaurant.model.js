@@ -36,36 +36,7 @@ const menuItemSchema = new mongoose.Schema({
         required: true,
         trim: true,
         lowercase: true
-    },
-
-    // ratings
-    ratedBy: [
-        {
-            userId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'User',
-                required: true
-            },
-            rating: {
-                type: Number,
-                required: true,
-                min: 1,
-                max: 5
-            }
-        }
-    ],
-    avgRating: {
-        type: Number,
-        default: 0,
-        min: 0,
-        max: 5
-    },
-    totalRatings: {
-        type: Number,
-        default: 0,
-        min: 0  
     }
-
 }, { timestamps: true });
 
 

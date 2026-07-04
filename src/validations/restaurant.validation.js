@@ -55,13 +55,11 @@ const rateRestaurantSchema = z.object({
         })
 })
 
-const rateMenuItemSchema = rateRestaurantSchema;
 
 module.exports = {
     createRestaurantSchema,
     updateRestaurantSchema,
     addMenuItemSchema,
     updateMenuItemSchema,
-    rateRestaurantSchema,
-    rateMenuItemSchema
+    rateRestaurantSchema
 };

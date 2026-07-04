@@ -54,8 +54,6 @@ router.get("/:restaurantId/banner", rc.getBannerImage);
 // rate restaurant
 router.post("/:restaurantId/rate", isLoggedIn, validate(val.rateRestaurantSchema), rc.rateRestaurant);
 
-// rate menu item
-router.post("/:restaurantId/menu/:menuItemId/rate", isLoggedIn, validate(val.rateMenuItemSchema), rc.rateMenuItem);
 
 
 
