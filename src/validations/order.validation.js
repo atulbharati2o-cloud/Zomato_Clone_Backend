@@ -11,6 +11,9 @@ const objectIdString = z.string()
 
 const placeOrderSchema = z.object({
     cartId: objectIdString,
+    paymentMethod: z.enum(["online", "cod"], {
+        errorMap: () => ({ message: "Invalid payment method" }) 
+    }),
     deliveryAddress: z.object({
         addressLine: z.string()
             .trim()

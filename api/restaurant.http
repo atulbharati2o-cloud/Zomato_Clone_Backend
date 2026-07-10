@@ -108,14 +108,7 @@ Content-Type: application/json
     "rating": 2
 }
 
-### Rate a menu item
-POST {{baseurl}}/{{restaurantId}}/menu/6a435f3e52cc812eab51417e/rate
-Authorization: Bearer {{loginRequest.response.body.data.token}}
-Content-Type: application/json
 
-{
-    "rating": 1
-}
 
 
 ### Get nearby restaurants home feed

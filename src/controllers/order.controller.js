@@ -24,7 +24,7 @@ const ALLOWED_TRANSITIONS = {
 const placeOrder = async (req, res) => {
     try{
         const userId = req.user._id;
-        const { cartId, deliveryAddress } = req.body; // deliveryAddress = { addressLine, coordinates: [longitude, latitude] }
+        const { cartId, deliveryAddress, paymentMethod } = req.body; // deliveryAddress = { addressLine, coordinates: [longitude, latitude] }
 
         const cart = await cartModel.findOne({ _id: cartId, user: userId });
         if(!cart){
@@ -82,6 +82,8 @@ const placeOrder = async (req, res) => {
                     coordinates: deliveryAddress.coordinates
                 }
             },
+            paymentMethod,
+            paymentStatus: 'pending',
             status: 'placed',
             statusHistory: [{
                 status: 'placed'

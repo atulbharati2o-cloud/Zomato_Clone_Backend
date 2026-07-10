@@ -144,6 +144,11 @@ const markOrderDelivered = async (req, res) => {
 
         order.status = 'delivered';
         order.statusHistory.push({ status: 'delivered' });
+
+        if(order.paymentMethod === 'cod'){
+            order.paymentStatus = 'paid';
+        }
+        
         await order.save();
 
         // Driver now becomes available

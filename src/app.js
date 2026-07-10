@@ -4,6 +4,9 @@ const express = require("express");
 const app = express();
 const path = require("path");
 
+
+app.use('/api/v1/payments', require('./routes/payment.route.js'));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -17,6 +20,10 @@ app.use("/api/v1/restaurants", require("./routes/restaurant.route.js"));
 app.use("/api/v1/discovery", require("./routes/discovery.route.js"));
 
 app.use("/api/v1/cart", require("./routes/cart.route.js"));
+
+app.use("/api/v1/orders", require("./routes/order.route.js"));
+
+app.use("/api/v1/drivers", require("./routes/driver.route.js"));
 
 
 
