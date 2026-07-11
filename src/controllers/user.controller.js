@@ -1,8 +1,7 @@
 const apiResponse = require('../utils/apiResponse.js');
 const apiError = require('../utils/apiError.js');
 const userModel = require('../models/user.model.js');
-const path = require('path');
-const fs = require('fs').promises;
+const { uploadBufferToCloudinary, deleteFromCloudinary } = require('../services/cloudinary.service.js');
 
 
 const registerUser = async (req, res) => {
@@ -79,17 +78,10 @@ const deleteAccount = async (req, res) => {
         const deletedUser = await userModel.findByIdAndDelete(userId);
         if(!deletedUser) return apiError(res, 404, 'User not found.', 'User not found.');
 
-        // delete avatar if exists and not default
-        if(deletedUser.avatar && !deletedUser.avatar.endsWith('default-avatar.avif')){
-            const avatarPath = path.join(process.cwd(), 'src', 'public', deletedUser.avatar);
-            try{
-                await fs.access(avatarPath);
-                await fs.unlink(avatarPath);
-                console.log('Avatar deleted successfully:', avatarPath);
-            } catch(unlinkError){
-                console.error('Error deleting avatar:', unlinkError.message);
-            }
+        if(deletedUser.avatar.publicId){
+            await deleteFromCloudinary(deletedUser.avatar.publicId);
         }
+
         return apiResponse(res, 200, 'User account deleted successfully.');
     } catch(error){
         console.error('Error in deleteAccount:', error);
@@ -103,7 +95,6 @@ const uploadAvatar = async (req, res) => {
         const user = await userModel.findById(userId);
 
         if(!user){
-            if(req.file) await fs.unlink(req.file.path).catch(err => console.error('Error deleting uploaded file:', err));
             return apiError(res, 404, 'User not found.', 'User not found.');
         }
         
@@ -111,26 +102,14 @@ const uploadAvatar = async (req, res) => {
             return apiError(res, 400, 'No image file uploaded.','No image file uploaded.');
         }
 
-        if(user.avatar && !user.avatar.endsWith('default-avatar.avif')){
-            const oldAvatarPath = path.join(process.cwd(), 'src', 'public', user.avatar);
-            try{
-                await fs.access(oldAvatarPath);
-                await fs.unlink(oldAvatarPath);
-                console.log('Old avatar deleted successfully:', oldAvatarPath);
-            } catch(unlinkError){
-                console.error('Error deleting old avatar:', unlinkError.message);
-            }
+        if(user.avatar.publicId){
+            await deleteFromCloudinary(user.avatar.publicId);
         }
 
-        user.avatar = `images/uploads/${req.file.filename}`;
+        const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, 'zomato-clone/avatars');
 
-        // save profile changes and handle potential errors during save
-        try{
-            await user.save();
-        } catch(saveError){
-            await fs.unlink(req.file.path).catch((err) => {});
-            throw saveError;
-        }
+        user.avatar = { url, publicId };
+        await user.save();
 
         return apiResponse(res, 200, 'Avatar uploaded successfully.', { avatar: user.avatar });
     } catch(error){
@@ -139,51 +118,20 @@ const uploadAvatar = async (req, res) => {
     }
 };
 
-const getAvatar = async (req, res) => {
-    try{
-        const userId = req.user._id;
-        const user = await userModel.findById(userId);
-
-        if(!user || !user.avatar){
-            return apiError(res, 404, 'Avatar not found.', 'Avatar not found.');
-        }
-
-        const absoluteAvatarPath = path.join(process.cwd(), 'src', 'public', user.avatar);
-        try{
-            await fs.access(absoluteAvatarPath);
-            return res.sendFile(absoluteAvatarPath);
-        } catch(accessError){
-            console.error("Database path exists but file is missing on server:", accessError.message);
-            return apiError(res, 404, 'Avatar file not found on server.', 'File not found.');
-        }
-
-    } catch(error){
-        console.error('Error in getAvatar:', error);
-        return apiError(res, 500, 'An error occurred while fetching the avatar.', 'Internal Server Error');
-    }
-};
-
 
 const removeAvatar = async (req, res) => {
     try{
         const userId = req.user._id;
         const user = await userModel.findById(userId);
-        if(!user){
-            return apiError(res, 404, 'User not found.', 'User not found.');
+        if(!user || !user.avatar){
+            return apiError(res, 404, 'Avatar not found.', 'Avatar not found.');
         }
 
-        if(user.avatar && !user.avatar.endsWith('default-avatar.avif')){
-            const avatarPath = path.join(process.cwd(), 'src', 'public', user.avatar);
-            try{
-                await fs.access(avatarPath);
-                await fs.unlink(avatarPath);
-                console.log('Avatar deleted successfully:', avatarPath);
-            } catch(unlinkError){
-                console.error('Error deleting avatar:', unlinkError.message);
-            }
+        if(user.avatar.publicId){
+            await deleteFromCloudinary(user.avatar.publicId);
         }
 
-        user.avatar = `images/uploads/default-avatar.avif`;
+        user.avatar = { url: "", publicId: null };
         await user.save();
 
         return apiResponse(res, 200, 'Avatar removed successfully.');
@@ -200,6 +148,5 @@ module.exports = {
     logoutUser,
     deleteAccount,
     uploadAvatar,
-    getAvatar,
     removeAvatar
 };

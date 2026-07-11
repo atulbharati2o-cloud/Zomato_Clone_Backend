@@ -1,8 +1,9 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 const { isLoggedIn } = require("../middlewares/auth.middleware.js");
 const val = require("../validations/payment.validation.js");
 const pc = require("../controllers/payment.controller.js");
-const validate = require("../middlewares/validate.middleware.js");
+const validate = require("../middlewares/validation.middleware.js");
 
 
 router.post("/initiate", express.json(), isLoggedIn, validate(val.initiatePaymentSchema), pc.initiatePayment);

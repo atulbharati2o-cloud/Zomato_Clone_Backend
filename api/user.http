@@ -38,9 +38,6 @@ DELETE {{baseurl}}/delete
 Authorization: Bearer {{loginRequest.response.body.data.token}}
 
 
-### Get Avatar
-GET {{baseurl}}/avatar
-Authorization: Bearer {{loginRequest.response.body.data.token}}
 
 ### Remove Avatar
 DELETE {{baseurl}}/avatar

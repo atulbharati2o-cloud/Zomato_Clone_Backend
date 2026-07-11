@@ -48,8 +48,6 @@ router.get("/:restaurantId", rc.getRestaurantDetails);
 // get menu items
 router.get("/:restaurantId/menu", rc.getMenuItems);
 
-// get banner image
-router.get("/:restaurantId/banner", rc.getBannerImage);
 
 // rate restaurant
 router.post("/:restaurantId/rate", isLoggedIn, validate(val.rateRestaurantSchema), rc.rateRestaurant);

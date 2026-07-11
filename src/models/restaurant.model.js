@@ -18,7 +18,16 @@ const menuItemSchema = new mongoose.Schema({
         min: 0
     },
     images: {
-        type: [String],
+        type: [{
+            url: {
+                type: String,
+                required: true
+            },
+            publicId: {
+                type: String,
+                required: true
+            }
+        }],
         default: []
     },
     isVeg: {
@@ -53,8 +62,14 @@ const restaurantSchema = new mongoose.Schema({
         maxlength: 500
     },
     bannerImage: {
-        type: String,
-        default: ""
+        url: {
+            type: String,
+            default: ""
+        },
+        publicId: {
+            type: String,
+            default: null
+        }
     },
     owner: {
         type: mongoose.Schema.Types.ObjectId,

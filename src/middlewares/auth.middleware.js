@@ -5,7 +5,6 @@ const restaurantModel = require('../models/restaurant.model.js');
 const mongoose = require('mongoose');
 const fs = require('fs').promises;
 const jwt = require('jsonwebtoken');
-const cleanupUploadedFiles = require('../utils/cleanupUploadedFiles.js');
 
 const isLoggedIn = async (req, res, next) => {
     try{
@@ -48,7 +47,6 @@ const isOwner = async (req, res, next) => {
 
         // role check
         if(!req.user || req.user.role !== "owner"){
-            await cleanupUploadedFiles(req);
             return apiError(res, 403, "Forbidden: Owners only", "Forbidden: Owners only");
         }
 
@@ -56,13 +54,11 @@ const isOwner = async (req, res, next) => {
         const { restaurantId } = req.params;
         if(restaurantId){
             if(!mongoose.Types.ObjectId.isValid(restaurantId)){
-                await cleanupUploadedFiles(req);
                 return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
             }
 
             const restaurant = await restaurantModel.findOne({ _id: restaurantId, owner: req.user._id });
             if(!restaurant){
-                await cleanupUploadedFiles(req);
                 return apiError(res, 403, "Forbidden: You do not own this restaurant", "Forbidden: You do not own this restaurant");
             }
 
@@ -72,7 +68,6 @@ const isOwner = async (req, res, next) => {
         return next();
     } catch(error){
         console.error('Error in isOwner middleware:', error);
-        await cleanupUploadedFiles(req);
         return apiError(res, 500, 'An error occurred while checking owner authentication.', error.message || 'Internal Server Error');
     }
 };

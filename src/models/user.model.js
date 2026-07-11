@@ -2,6 +2,17 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+const pointSchema = new mongoose.Schema({
+    type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+    },
+    coordinates: {
+        type: [Number]
+    }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
     firstName: {
         type: String,
@@ -16,9 +27,14 @@ const userSchema = new mongoose.Schema({
         maxlength: 50
     },
     avatar: {
-        type: String,
-        trim: true,
-        default: "images/uploads/default-avatar.avif" // Default avatar path
+        url: {
+            type: String,
+            default: ""
+        },
+        publicId: {
+            type: String,
+            default: null
+        }
     },
     email: {
         type: String,
@@ -96,15 +112,8 @@ const userSchema = new mongoose.Schema({
     },
     // Driver's live location
     currentLocation: {
-        type: {
-            type: String,
-            enum: ['Point'],
-            default: 'Point'
-        },
-        coordinates: {
-            type: [Number], // [longitude, latitude]
-            default: undefined
-        }
+        type: pointSchema,
+        default: undefined
     }
 }, { timestamps: true });
 

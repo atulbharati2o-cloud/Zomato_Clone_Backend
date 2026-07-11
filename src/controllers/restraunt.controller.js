@@ -3,9 +3,8 @@ const apiError = require('../utils/apiError.js');
 const restaurantModel = require('../models/restaurant.model.js');
 const userModel = require('../models/user.model.js');
 const orderModel = require('../models/order.model.js');
-const fs = require('fs').promises;
-const path = require('path');
 const mongoose = require('mongoose');
+const { deleteFromCloudinary, uploadBufferToCloudinary } = require('../services/cloudinary.service.js');
 
 
 // =================== OWNER SPECIFIC CONTROLLERS ===================
@@ -89,34 +88,18 @@ const uploadBannerImage = async (req, res) => {
             return apiError(res, 400, "No banner image file uploaded", "Bad Request");
         }
 
-        if(restaurant.bannerImage && restaurant.bannerImage !== ""){
-            const oldBannerPath = path.join(process.cwd(), 'src', 'public', restaurant.bannerImage);
-            try{
-                await fs.access(oldBannerPath);
-                await fs.unlink(oldBannerPath);
-            } catch(unlinkError){
-                console.error("Error deleting old banner image:", unlinkError.message);
-            }
+        if(restaurant.bannerImage.publicId){
+            await deleteFromCloudinary(restaurant.bannerImage.publicId);
         }
 
-        restaurant.bannerImage = `images/uploads/${req.file.filename}`;
-
-        try{
-            await restaurant.save();
-        } catch(saveError){
-            await fs.unlink(req.file.path).catch((err) => {});
-            throw saveError;
-        }
+        const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, 'zomato-clone/banners');
+        restaurant.bannerImage = { url, publicId };
+        await restaurant.save();
 
         return apiResponse(res, 200, "Banner image uploaded successfully", { restaurant });
         
     } catch(error){
         console.error("Error uploading banner image:", error);
-        if(req.file){
-            await fs.unlink(req.file.path).catch((err) => {
-                console.error("Error deleting uploaded banner image after failure:", err);
-            });
-        }
         return apiError(res, 500, "Error uploading banner image", error.message);
     }
 };
@@ -126,19 +109,15 @@ const deleteBannerImage = async (req, res) => {
     try{
         const restaurant = req.restaurant;
 
-        if(!restaurant.bannerImage || restaurant.bannerImage === ""){
-            return apiError(res, 404, "No banner image.", "Not Found");
+        if(!restaurant.bannerImage.url){
+            return apiError(res, 404, "No banner image", "Not Found");
         }
 
-        const bannerImagePath = path.join(process.cwd(), 'src', 'public', restaurant.bannerImage);
-        try{
-            await fs.access(bannerImagePath);
-            await fs.unlink(bannerImagePath);
-        } catch(unlinkError){
-            console.error("Error deleting banner image:", unlinkError.message);
+        if(restaurant.bannerImage.publicId){
+            await deleteFromCloudinary(restaurant.bannerImage.publicId);
         }
 
-        restaurant.bannerImage = "";
+        restaurant.bannerImage = {url: "", publicId: null };
         await restaurant.save();
         return apiResponse(res, 200, "Banner image deleted successfully");
     } catch(error){
@@ -166,13 +145,11 @@ const addMenuItem = async (req, res) => {
     try{
         const restaurant = req.restaurant;
 
-        let savedImagePaths = [];
-
+        let uploadedImages = [];
         if(req.files && req.files.length > 0){
-            for(const file of req.files){
-                const imagePath = `images/uploads/${file.filename}`;
-                savedImagePaths.push(imagePath);
-            }
+            uploadedImages = await Promise.all(
+                req.files.map(file => uploadBufferToCloudinary(file.buffer, 'zomato/menu-items'))
+            );
         }
 
         const { name, description, price, isVeg, category } = req.body;
@@ -181,7 +158,7 @@ const addMenuItem = async (req, res) => {
             name,
             description,
             price,
-            images: savedImagePaths,
+            images: uploadedImages,
             isVeg: isVeg === 'true' || isVeg === true,
             category
         };
@@ -221,29 +198,17 @@ const updateMenuItem = async (req, res) => {
         if(req.files && req.files.length > 0){
             const maxImages = 5;
             if(restaurant.menu[menuItemIndex].images.length + req.files.length > maxImages){
-                for(const file of req.files){
-                    await fs.unlink(file.path).catch(() => {});
-                }
                 return apiError(res, 400, `You can upload a maximum of ${maxImages} images`, "Bad Request");
             }
 
-            for(const file of req.files){
-                const imagePath = `images/uploads/${file.filename}`;
-                restaurant.menu[menuItemIndex].images.push(imagePath);
-            }
+            const uploadedImages = await Promise.all(
+                req.files.map(file => uploadBufferToCloudinary(file.buffer, 'zomato-clone/menu-items'))
+            );
+
+            restaurant.menu[menuItemIndex].images.push(...uploadedImages);
         }
 
-        try{
-            await restaurant.save();
-        } catch(saveError){
-            if(req.files){
-                for(const file of req.files){
-                    await fs.unlink(file.path).catch(() => {});
-                }
-            }
-            throw saveError;
-        }
-
+        await restaurant.save();
         return apiResponse(res, 200, "Menu item updated successfully", { menuItem: restaurant.menu[menuItemIndex] });
 
     } catch(error){
@@ -268,15 +233,9 @@ const deleteMenuItem = async (req, res) => {
         }
 
         if(restaurant.menu[menuItemIndex].images && restaurant.menu[menuItemIndex].images.length > 0){
-            for(const image of restaurant.menu[menuItemIndex].images){
-                const imagePath = path.join(process.cwd(), 'src', 'public', image);
-                try{
-                    await fs.access(imagePath);
-                    await fs.unlink(imagePath);
-                } catch(unlinkError){
-                    console.error("Error deleting menu item image:", unlinkError.message);
-                }
-            }
+            await Promise.all(
+                restaurant.menu[menuItemIndex].images.map(img => deleteFromCloudinary(img.publicId))
+            );
         }
 
         restaurant.menu.splice(menuItemIndex, 1);
@@ -451,22 +410,6 @@ const getMenuItems = async (req, res) => {
 };
 
 
-const getBannerImage = async (req, res) => {
-    try{
-        const { restaurantId } = req.params;
-        const restaurant = await restaurantModel.findById(restaurantId);
-        if(!restaurant || !restaurant.bannerImage){
-            return apiError(res, 404, "Banner image not found", "Not Found");
-        }
-
-        const absoluteBannerPath = path.join(process.cwd(), 'src', 'public', restaurant.bannerImage);
-        return res.sendFile(absoluteBannerPath);
-    } catch(error){
-        console.error("Error fetching banner image:", error);
-        return apiError(res, 500, "Error fetching banner image", error.message);
-    }
-};
-
 
 
 
@@ -600,7 +543,6 @@ module.exports = {
     toggleItemAvailability,
     getRestaurantDetails,
     getMenuItems,
-    getBannerImage,
     rateRestaurant,
     getNearbyRestaurantsFeed
 };

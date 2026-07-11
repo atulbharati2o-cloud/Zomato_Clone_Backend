@@ -1,7 +1,6 @@
 const apiError = require("../utils/apiError.js");
 const apiResponse = require("../utils/apiResponse.js");
 const { ZodError } = require("zod");
-const cleanupUploadedFiles = require("../utils/cleanupUploadedFiles.js");
 
 const validate = (schema) => async (req, res, next) => {
     try{
@@ -17,8 +16,6 @@ const validate = (schema) => async (req, res, next) => {
         return next();
 
     } catch(err){
-
-        await cleanupUploadedFiles(req);
 
         if(err instanceof ZodError){
             const formattedErrors = err.issues.map(issue =>{

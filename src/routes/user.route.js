@@ -1,19 +1,18 @@
 const router = require('express').Router();
-const { registerUser, loginUser, viewProfile, logoutUser, deleteAccount, uploadAvatar, getAvatar, removeAvatar } = require('../controllers/user.controller.js');
+const uc = require('../controllers/user.controller.js');
 const { isLoggedIn } = require('../middlewares/auth.middleware.js');
 const { registerSchema, loginSchema } = require('../validations/user.validation.js');
 const validate = require('../middlewares/validation.middleware.js');
 const upload = require('../config/multer.js');
 
-router.post('/register', validate(registerSchema), registerUser);
-router.post('/login', validate(loginSchema), loginUser);
-router.get('/profile', isLoggedIn, viewProfile);
-router.post('/logout', isLoggedIn, logoutUser);
-router.delete('/delete', isLoggedIn, deleteAccount);
+router.post('/register', validate(registerSchema), uc.registerUser);
+router.post('/login', validate(loginSchema), uc.loginUser);
+router.get('/profile', isLoggedIn, uc.viewProfile);
+router.post('/logout', isLoggedIn, uc.logoutUser);
+router.delete('/delete', isLoggedIn, uc.deleteAccount);
 
 // Avatar routes
-router.post('/avatar', isLoggedIn, upload.single('avatar'), uploadAvatar);
-router.get('/avatar', isLoggedIn, getAvatar);
-router.delete('/avatar', isLoggedIn, removeAvatar);
+router.post('/avatar', isLoggedIn, upload.single('avatar'), uc.uploadAvatar);
+router.delete('/avatar', isLoggedIn, uc.removeAvatar);
 
 module.exports = router;
