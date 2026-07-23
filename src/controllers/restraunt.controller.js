@@ -5,6 +5,18 @@ const userModel = require('../models/user.model.js');
 const orderModel = require('../models/order.model.js');
 const mongoose = require('mongoose');
 const { deleteFromCloudinary, uploadBufferToCloudinary } = require('../services/cloudinary.service.js');
+const { redis } = require('../config/redis.js');
+
+// Helper to clear restaurant details and menu cache in Redis
+const invalidateRestaurantCache = async (restaurantId) => {
+    try{
+        if(!restaurantId) return;
+        const cacheKey = `restaurant:${restaurantId.toString()}`;
+        await redis.del(cacheKey);
+    } catch(error){
+        console.error("Failed to clear Redis cache:", error);
+    }
+}
 
 
 // =================== OWNER SPECIFIC CONTROLLERS ===================
@@ -72,6 +84,9 @@ const updateRestaurantDetails = async (req, res) => {
         }
 
         await restaurant.save();
+
+        await invalidateRestaurantCache(restaurant._id);
+
         return apiResponse(res, 200, "Restaurant details updated successfully", { restaurant });
     } catch(error){
         console.error("Error updating restaurant details:", error);
@@ -95,6 +110,8 @@ const uploadBannerImage = async (req, res) => {
         const { url, publicId } = await uploadBufferToCloudinary(req.file.buffer, 'zomato-clone/banners');
         restaurant.bannerImage = { url, publicId };
         await restaurant.save();
+        
+        await invalidateRestaurantCache(restaurant._id);
 
         return apiResponse(res, 200, "Banner image uploaded successfully", { restaurant });
         
@@ -119,6 +136,9 @@ const deleteBannerImage = async (req, res) => {
 
         restaurant.bannerImage = {url: "", publicId: null };
         await restaurant.save();
+
+        await invalidateRestaurantCache(restaurant._id);
+
         return apiResponse(res, 200, "Banner image deleted successfully");
     } catch(error){
         console.error("Error deleting banner image:", error);
@@ -133,6 +153,9 @@ const toggleRestaurantStatus = async (req, res) => {
 
         restaurant.isOpen = !restaurant.isOpen;
         await restaurant.save();
+
+        await invalidateRestaurantCache(restaurant._id);
+
         return apiResponse(res, 200, `Restaurant is now ${restaurant.isOpen ? 'open' : 'closed'}`, { isOpen: restaurant.isOpen });
     } catch(error){
         console.error("Error toggling restaurant status:", error);
@@ -165,6 +188,8 @@ const addMenuItem = async (req, res) => {
 
         restaurant.menu.push(newMenuItem);
         await restaurant.save();
+
+        await invalidateRestaurantCache(restaurant._id);
 
         return apiResponse(res, 201, "Item added to menu successfully", { menuItem: newMenuItem });
     } catch(error){
@@ -209,6 +234,9 @@ const updateMenuItem = async (req, res) => {
         }
 
         await restaurant.save();
+
+        await invalidateRestaurantCache(restaurant._id);
+
         return apiResponse(res, 200, "Menu item updated successfully", { menuItem: restaurant.menu[menuItemIndex] });
 
     } catch(error){
@@ -241,6 +269,8 @@ const deleteMenuItem = async (req, res) => {
         restaurant.menu.splice(menuItemIndex, 1);
         await restaurant.save();
 
+        await invalidateRestaurantCache(restaurant._id);
+        
         return apiResponse(res, 200, "Menu item deleted successfully");
     } catch(error){
         console.error("Error deleting menu item:", error);
@@ -266,6 +296,8 @@ const toggleItemAvailability = async (req, res) => {
         restaurant.menu[menuItemIndex].isAvailable = !restaurant.menu[menuItemIndex].isAvailable;
         await restaurant.save();
 
+        await invalidateRestaurantCache(restaurant._id);
+
         return apiResponse(res, 200, `Menu item is now ${restaurant.menu[menuItemIndex].isAvailable ? 'available' : 'unavailable'}`, { isAvailable: restaurant.menu[menuItemIndex].isAvailable });
     } catch(error){
         console.error("Error toggling item availability:", error);
@@ -284,10 +316,21 @@ const getRestaurantDetails = async (req, res) => {
             return apiError(res, 400, "Invalid restaurant ID", "Bad Request");
         }
 
+        const cacheKey = `restaurant:${restaurantId}`;
+        const cachedData = await redis.get(cacheKey);
+
+        if(cachedData){
+            const restaurant = JSON.parse(cachedData);
+            return apiResponse(res, 200, "Restaurant details fetched successfully (Cache HIT)", { restaurant });
+        }
+
         const restaurant = await restaurantModel.findById(restaurantId).select('-ratedBy');
         if(!restaurant){
             return apiError(res, 404, "Restaurant profile not found", "Not Found");
         }
+
+        // Store restaurant details in Redis cache for 15 minutes (900 seconds)
+        await redis.setex(cacheKey, 900, JSON.stringify(restaurant)); 
 
         return apiResponse(res, 200, "Restaurant details fetched successfully", { restaurant });
 
@@ -310,12 +353,23 @@ const getMenuItems = async (req, res) => {
         const limitNumber = Math.max(1, parseInt(limit));
         const skip = (pageNumber - 1) * limitNumber;
 
-        const restaurant = await restaurantModel.findById(restaurantId).select('menu');
-        if(!restaurant){
-            return apiError(res, 404, "Restaurant profile not found", "Not Found");
+        let fullMenu = [];
+
+        const cacheKey = `restaurant:${restaurantId}`;
+        const cachedRestaurant = await redis.get(cacheKey);
+        if(cachedRestaurant){
+            const parsed = JSON.parse(cachedRestaurant);
+            fullMenu = parsed.menu || [];
+        } else {
+            const restaurant = await restaurantModel.findById(restaurantId).select('-ratedBy');
+            if(!restaurant){
+                return apiError(res, 404, "Restaurant profile not found", "Not Found");
+            }
+
+            await redis.setex(cacheKey, 900, JSON.stringify(restaurant)); // Cache for 15 minutes
+            fullMenu = restaurant.menu || [];
         }
 
-        let fullMenu = restaurant.menu || [];
         let organizedMenu = [];
         let pinnedCount = 0;
 
@@ -457,6 +511,8 @@ const rateRestaurant = async (req, res) => {
         restaurant.totalRatings = totalRatings;
 
         await restaurant.save();
+
+        await invalidateRestaurantCache(restaurant._id);
 
         return apiResponse(res, 200, "Restaurant rated successfully", { yourRating: rating  , avgRating: restaurant.avgRating, totalRatings: restaurant.totalRatings });
     } catch(error){

@@ -7,9 +7,10 @@ POST http://localhost:3000/api/v1/users/login
 Content-Type: application/json
 
 {
-    "identifier": "john.doe@example.com",
+    "identifier": "atul.bharati@example.com",
     "password": "fdhjAH@343d"
 }
+
 
 ### Create a new restaurant
 POST {{baseurl}}/
@@ -23,7 +24,8 @@ Content-Type: application/json
     "coordinates": [
         -122.4194,
         37.7749
-    ]
+    ],
+    "pureVeg": true
 }
 
 ### get all restaurants owned by you
@@ -31,7 +33,7 @@ GET {{baseurl}}/owner
 Authorization: Bearer {{loginRequest.response.body.data.token}}
 
 ### Update restaurant details
-@restaurantId = 6a4253263b1040166d75f1b1
+@restaurantId = 6a60e086721d0c4debb6b405
 PATCH {{baseurl}}/{{restaurantId}}
 Authorization: Bearer {{loginRequest.response.body.data.token}}
 Content-Type: application/json
@@ -40,9 +42,6 @@ Content-Type: application/json
     "description": "An updated description for The Gourmet Kitchen, highlighting our new seasonal menu and chef's specials."
 }
 
-
-### Get banner image of restaurant
-GET {{baseurl}}/{{restaurantId}}/banner
 
 
 ### Delete banner image
@@ -65,9 +64,9 @@ Authorization: Bearer {{loginRequest.response.body.data.token}}
 Content-Type: application/json
 
 {
-    "name": "Spaghetti Carbonara",
-    "description": "A classic Italian pasta dish with eggs, cheese, pancetta, and black pepper.",
-    "price": 14.99,
+    "name": "litti chokha",
+    "description": "A traditional Indian dish made of stuffed litti served with chokha.",
+    "price": 250,
     "isVeg": true,
     "category": "Main Course"
 }
@@ -96,6 +95,8 @@ Authorization: Bearer {{loginRequest.response.body.data.token}}
 
 
 ### Get all menu items of a restaurant
+
+
 GET {{baseurl}}/{{restaurantId}}/menu
 
 

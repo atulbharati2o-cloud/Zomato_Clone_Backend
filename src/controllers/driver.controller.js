@@ -4,28 +4,29 @@ const orderModel = require('../models/order.model.js');
 const userModel = require('../models/user.model.js');
 const mongoose = require('mongoose');
 const { ORDER_STATUSES } = require('../utils/constants.js');
+const { redis } = require('../config/redis.js');
 
 
 // Called periodically by driver's device to keep currentLocation fresh
 const updateDriverLocation = async (req, res) => {
     try{
-        const driverId = req.user._id;
+        const driverId = req.user._id.toString();
         const { coordinates } = req.body;
+        const [longitude, latitude] = coordinates;
 
-        const driver = await userModel.findByIdAndUpdate(
-            driverId,
-            {
-                currentLocation: {
-                    type: 'Point',
-                    coordinates: coordinates
-                }
-            },
-            {
-                returnDocument: 'after'
-            }
-        )
+        await redis.geoadd('drivers:locations', longitude, latitude, driverId);
+
+        // Asynchronously update the driver's currentLocation in the database
+        userModel.findByIdAndUpdate(driverId, {
+            currentLocation: { type: 'Point', coordinates }
+        }).exec();
         
-        return apiResponse(res, 200, "Driver location updated successfully", { currentLocation: driver.currentLocation });
+        return apiResponse(res, 200, "Driver location updated successfully", {
+            currentLocation: {
+                type: 'Point',
+                coordinates: coordinates
+            }
+        });
 
     } catch(error){
         console.error("Error updating driver location:", error);
@@ -37,7 +38,7 @@ const updateDriverLocation = async (req, res) => {
 // Toggle the driver's availability status
 const toggleDriverAvailability = async (req, res) => {
     try{
-        const driverId = req.user._id;
+        const driverId = req.user._id.toString();
         const { isAvailable } = req.body;
 
         const driver = await userModel.findByIdAndUpdate(
@@ -45,6 +46,10 @@ const toggleDriverAvailability = async (req, res) => {
             { isAvailable },
             { returnDocument: 'after' }
         );
+
+        if(!isAvailable){
+            await redis.zrem('drivers:locations', driverId);
+        }
 
         return apiResponse(res, 200, "Driver availability status updated successfully", { isAvailable: driver.isAvailable });
     } catch(error){
